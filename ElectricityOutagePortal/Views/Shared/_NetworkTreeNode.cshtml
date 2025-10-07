@@ -1,0 +1,46 @@
+@model ElectricityOutagePortal.ViewModels.NetworkElementNode
+
+@if (Model != null)
+{
+    <div class="tree-node-container">
+        <div class="tree-node" onclick="selectTreeNode(this)">
+            @if (Model.Children != null && Model.Children.Any())
+            {
+                <span class="tree-toggle" onclick="toggleTreeNode(this)">▼</span>
+            }
+            else
+            {
+                <span class="tree-spacer">&nbsp;&nbsp;&nbsp;</span>
+            }
+            <i class="fas fa-@(GetIconForType(Model.Type)) me-1"></i>
+            <span class="node-text">@Model.Name</span>
+            <small class="text-muted">(ID: @Model.Id)</small>
+        </div>
+        
+        @if (Model.Children != null && Model.Children.Any())
+        {
+            <div class="tree-children">
+                @foreach (var child in Model.Children)
+                {
+                    @await Html.PartialAsync("_NetworkTreeNode", child)
+                }
+            </div>
+        }
+    </div>
+}
+
+@functions {
+    private string GetIconForType(string type)
+    {
+        return type?.ToLower() switch
+        {
+            "region" => "map-marked-alt",
+            "governorate" => "city",
+            "district" => "building",
+            "substation" => "bolt",
+            "feeder" => "plug",
+            "transformer" => "cog",
+            _ => "circle"
+        };
+    }
+}

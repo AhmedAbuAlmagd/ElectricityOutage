@@ -1,0 +1,409 @@
+@model ElectricityOutagePortal.ViewModels.SearchViewModel
+@{
+    ViewData["Title"] = "Ignored Outages";
+}
+
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <div class="portal-header">
+                <h2 class="portal-title">Ignored Outages</h2>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Buttons -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="nav-buttons">
+                <button type="button" class="btn btn-outline-primary" onclick="location.href='@Url.Action("Index")'">
+                    <i class="fas fa-search"></i> Search
+                </button>
+                <button type="button" class="btn btn-secondary active">
+                    <i class="fas fa-eye-slash"></i> Ignored Outages
+                </button>
+                <button type="button" class="btn btn-outline-info" onclick="location.href='@Url.Action("NetworkHierarchy")'">
+                    <i class="fas fa-plus"></i> Add
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Filter Ignored Outages</h5>
+        </div>
+        <div class="card-body">
+            <form asp-action="IgnoredOutages" method="get">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Date From</label>
+                        <input type="date" name="dateFrom" class="form-control" value="@ViewBag.DateFrom" />
+                    </div>
+
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Date To</label>
+                        <input type="date" name="dateTo" class="form-control" value="@ViewBag.DateTo" />
+                    </div>
+
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Search Value</label>
+                        <input type="text" name="searchValue" class="form-control" placeholder="Search..." value="@ViewBag.SearchValue" />
+                    </div>
+
+                    <div class="col-md-3 mb-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-search"></i> Filter
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="action-buttons">
+                <button type="button" class="btn btn-danger" onclick="deleteSelected()">
+                    <i class="fas fa-trash"></i> Delete Selected
+                </button>
+                <button type="button" class="btn btn-success">
+                    <i class="fas fa-file-excel"></i> Export to Excel
+                </button>
+                <button type="button" class="btn btn-info">
+                    <i class="fas fa-file-pdf"></i> Export to PDF
+                </button>
+                <button type="button" class="btn btn-warning" onclick="restoreSelected()">
+                    <i class="fas fa-undo"></i> Restore Selected
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ignored Outages Table -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Ignored Outages (@(Model?.Results?.Count() ?? 0) items)</span>
+            <div class="table-controls">
+                <input type="text" class="form-control search-box" placeholder="Quick search..." style="width: 200px;">
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0" id="ignoredOutagesTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th><input type="checkbox" class="form-check-input" id="selectAll"></th>
+                            <th>Cutting_Down_Key</th>
+                            <th>Incident_ID</th>
+                            <th>Channel_Key</th>
+                            <th>Planned</th>
+                            <th>Global</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                            <th>Ignored Date</th>
+                            <th>Ignored By</th>
+                            <th>Reason</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model?.Results != null && Model.Results.Any())
+                        {
+                            @foreach (var item in Model.Results)
+                            {
+                                <tr data-id="@item.Cutting_Down_Key">
+                                    <td><input type="checkbox" class="form-check-input row-checkbox" value="@item.Cutting_Down_Key"></td>
+                                    <td>@item.Cutting_Down_Key</td>
+                                    <td>@item.Cutting_Down_Incident_ID</td>
+                                    <td>@item.Channel_Key</td>
+                                    <td>
+                                        <span class="badge bg-@(item.IsPlanned == true ? "success" : "warning")">
+                                            @(item.IsPlanned == true ? "Yes" : "No")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-@(item.IsGlobal == true ? "info" : "secondary")">
+                                            @(item.IsGlobal == true ? "Yes" : "No")
+                                        </span>
+                                    </td>
+                                    <td>@item.PlannedStartDTS?.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>@item.PlannedEndDTS?.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>@DateTime.Now.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>@item.CreateSystemUserID</td>
+                                    <td>
+                                        <span class="text-muted">System ignored</span>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-primary btn-sm" onclick="viewDetails('@item.Cutting_Down_Key')">
+                                            <i class="fas fa-eye"></i> View
+                                        </button>
+                                        <button type="button" class="btn btn-warning btn-sm" onclick="restoreOutage('@item.Cutting_Down_Key')">
+                                            <i class="fas fa-undo"></i> Restore
+                                        </button>
+                                        <button type="button" class="btn btn-danger btn-sm" onclick="deleteOutage('@item.Cutting_Down_Key')">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="12" class="text-center text-muted py-4">
+                                    <i class="fas fa-inbox fa-2x mb-2"></i>
+                                    <br>
+                                    No ignored outages found
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    @if (Model?.PagedResults != null && Model.PagedResults.TotalPages > 1)
+    {
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination">
+                        @if (Model.PagedResults.HasPreviousPage)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="@Url.Action("IgnoredOutages", new { pageNumber = 1, pageSize = Model.PageSize })">First</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="@Url.Action("IgnoredOutages", new { pageNumber = Model.PageNumber - 1, pageSize = Model.PageSize })">Previous</a>
+                            </li>
+                        }
+
+                        @for (int i = Math.Max(1, Model.PageNumber - 2); i <= Math.Min(Model.PagedResults.TotalPages, Model.PageNumber + 2); i++)
+                        {
+                            <li class="page-item @(i == Model.PageNumber ? "active" : "")">
+                                <a class="page-link" href="@Url.Action("IgnoredOutages", new { pageNumber = i, pageSize = Model.PageSize })">@i</a>
+                            </li>
+                        }
+
+                        @if (Model.PagedResults.HasNextPage)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" href="@Url.Action("IgnoredOutages", new { pageNumber = Model.PageNumber + 1, pageSize = Model.PageSize })">Next</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="@Url.Action("IgnoredOutages", new { pageNumber = Model.PagedResults.TotalPages, pageSize = Model.PageSize })">Last</a>
+                            </li>
+                        }
+                    </ul>
+                </nav>
+            </div>
+            <div class="col-md-6 text-end">
+                <div class="pagination-info">
+                    <select class="form-select d-inline-block w-auto me-2" onchange="changePageSize(this.value)">
+                        <option value="20" selected="@(Model.PageSize == 20)">20</option>
+                        <option value="50" selected="@(Model.PageSize == 50)">50</option>
+                        <option value="100" selected="@(Model.PageSize == 100)">100</option>
+                    </select>
+                    items per page
+                    <br>
+                    <small class="text-muted">Total: @Model.TotalCount</small>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .portal-header {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+
+    .portal-title {
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .nav-buttons {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-start;
+    }
+
+    .nav-buttons .btn {
+        border-radius: 20px;
+        padding: 8px 20px;
+        font-weight: 500;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .table-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .search-box {
+        border-radius: 20px;
+    }
+
+    .table th {
+        background-color: #495057;
+        color: white;
+        border: none;
+        font-weight: 500;
+        padding: 12px 8px;
+        font-size: 14px;
+    }
+
+    .table td {
+        padding: 10px 8px;
+        vertical-align: middle;
+        font-size: 14px;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 12px;
+        margin-right: 2px;
+    }
+
+    .pagination-info {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .card {
+        border: none;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        font-weight: 600;
+    }
+
+    .badge {
+        font-size: 11px;
+    }
+</style>
+
+<script>
+    function clearFilters() {
+        document.querySelector('input[name="dateFrom"]').value = '';
+        document.querySelector('input[name="dateTo"]').value = '';
+        document.querySelector('input[name="searchValue"]').value = '';
+    }
+
+    function deleteSelected() {
+        var selectedIds = [];
+        document.querySelectorAll('.row-checkbox:checked').forEach(function(checkbox) {
+            selectedIds.push(checkbox.value);
+        });
+
+        if (selectedIds.length === 0) {
+            alert('Please select at least one item to delete.');
+            return;
+        }
+
+        if (confirm('Are you sure you want to permanently delete ' + selectedIds.length + ' selected item(s)?')) {
+            // Implementation for bulk delete
+            console.log('Deleting items:', selectedIds);
+            // You can implement AJAX call here
+        }
+    }
+
+    function restoreSelected() {
+        var selectedIds = [];
+        document.querySelectorAll('.row-checkbox:checked').forEach(function(checkbox) {
+            selectedIds.push(checkbox.value);
+        });
+
+        if (selectedIds.length === 0) {
+            alert('Please select at least one item to restore.');
+            return;
+        }
+
+        if (confirm('Are you sure you want to restore ' + selectedIds.length + ' selected item(s)?')) {
+            // Implementation for bulk restore
+            console.log('Restoring items:', selectedIds);
+            // You can implement AJAX call here
+        }
+    }
+
+    function viewDetails(id) {
+        // Implementation for viewing outage details
+        alert('Viewing details for outage ID: ' + id);
+        // You can implement modal or navigation to details page
+    }
+
+    function restoreOutage(id) {
+        if (confirm('Are you sure you want to restore this outage?')) {
+            // Implementation for single restore
+            console.log('Restoring outage:', id);
+            // You can implement AJAX call here
+        }
+    }
+
+    function deleteOutage(id) {
+        if (confirm('Are you sure you want to permanently delete this outage?')) {
+            // Implementation for single delete
+            console.log('Deleting outage:', id);
+            // You can implement AJAX call here
+        }
+    }
+
+    function changePageSize(pageSize) {
+        var url = new URL(window.location);
+        url.searchParams.set('pageSize', pageSize);
+        url.searchParams.set('pageNumber', '1');
+        window.location = url;
+    }
+
+    // Select all checkbox functionality
+    document.getElementById('selectAll')?.addEventListener('change', function() {
+        var checkboxes = document.querySelectorAll('.row-checkbox');
+        checkboxes.forEach(function(checkbox) {
+            checkbox.checked = this.checked;
+        }, this);
+    });
+
+    // Quick search functionality
+    document.querySelector('.search-box')?.addEventListener('input', function() {
+        var searchTerm = this.value.toLowerCase();
+        var tableRows = document.querySelectorAll('#ignoredOutagesTable tbody tr');
+        
+        tableRows.forEach(function(row) {
+            var text = row.textContent.toLowerCase();
+            if (text.includes(searchTerm) || searchTerm === '') {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+</script>
