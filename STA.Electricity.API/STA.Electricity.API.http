@@ -1,0 +1,63 @@
+@STA.Electricity.API_HostAddress = http://localhost:5000
+
+### Health Check
+GET {{STA.Electricity.API_HostAddress}}/health
+Accept: application/json
+
+###
+
+### Sync Source A (Cabin Incidents)
+POST {{STA.Electricity.API_HostAddress}}/api/sync?source=A
+Accept: application/json
+
+###
+
+### Sync Source B (Cable Incidents)
+POST {{STA.Electricity.API_HostAddress}}/api/sync?source=B
+Accept: application/json
+
+###
+
+### Generate Cabin Incidents (Source A) - Planned Scenario
+POST {{STA.Electricity.API_HostAddress}}/api/testdata/cabin-incidents
+Content-Type: application/json
+
+{
+  "count": 5,
+  "scenario": "planned"
+}
+
+###
+
+### Generate Cabin Incidents (Source A) - Emergency Scenario
+POST {{STA.Electricity.API_HostAddress}}/api/testdata/cabin-incidents
+Content-Type: application/json
+
+{
+  "count": 3,
+  "scenario": "emergency"
+}
+
+###
+
+### Generate Cable Incidents (Source B) - Global Scenario
+POST {{STA.Electricity.API_HostAddress}}/api/testdata/cable-incidents
+Content-Type: application/json
+
+{
+  "count": 4,
+  "scenario": "global"
+}
+
+###
+
+### Generate Cable Incidents (Source B) - Mixed Scenario
+POST {{STA.Electricity.API_HostAddress}}/api/testdata/cable-incidents
+Content-Type: application/json
+
+{
+  "count": 10,
+  "scenario": "mixed"
+}
+
+###
