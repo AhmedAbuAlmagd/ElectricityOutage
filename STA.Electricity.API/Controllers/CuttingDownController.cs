@@ -54,9 +54,22 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var query = _context.CuttingDownHeaders.AsQueryable();
+                var query = _context.CuttingDownHeaders
+                    .Include(x => x.CuttingDownDetails).ThenInclude(y => y.NetworkElementKeyNavigation)
+                    .AsQueryable();
 
-                // Apply filters
+                if (sourceKey.HasValue)
+                {
+                    if (sourceKey.Value == 1)
+                    {
+                        query = query.Where(x => x.ChannelKey == 1);
+                    }
+                    else if (sourceKey.Value == 2)
+                    {
+                        query = query.Where(x=> x.ChannelKey == 2);
+                    }
+                }
+
                 if (problemTypeKey.HasValue)
                 {
                     query = query.Where(x => x.CuttingDownProblemTypeKey == problemTypeKey.Value);
@@ -71,29 +84,35 @@ namespace STA.Electricity.API.Controllers
                 {
                     query = query.Where(x => x.ActualCreateDate <= toDate.Value);
                 }
+                var cuttingdownDetails = _context.CuttingDownDetails.Where(d => d.NetworkElementKey == networkElementTypeKey.Value);
 
+                if (networkElementTypeKey.HasValue)
+                {
+                        var cuttingdownKeys = cuttingdownDetails.Select(d => d.CuttingDownKey);
+                         query = query.Where(x => cuttingdownKeys.Contains(x.CuttingDownKey));
+
+                }
                 if (!string.IsNullOrEmpty(searchValue))
                 {
                     query = query.Where(x => x.CuttingDownIncidentId.ToString().Contains(searchValue));
                 }
 
-                // Get total count
                 var totalCount = await query.CountAsync();
 
-                // Apply pagination
                 var items = await query
                     .OrderByDescending(x => x.ActualCreateDate)
                     .Skip((page - 1) * pageSize)
                     .Take(pageSize)
                     .Select(x => new CuttingDownHeaderDto
                     {
+
                         CuttingIncidentId = x.CuttingDownIncidentId.ToString(),
-                        NetworkElementName = "Network Element",
+                        NetworkElementName = "Netowrk Element",
                         NumberOfImpactedCustomers = 0,
                         StartDate = x.ActualCreateDate ?? DateTime.MinValue,
                         EndDate = x.ActualEndDate,
                         ProblemTypeKey = x.CuttingDownProblemTypeKey ?? 0,
-                        Source = "System",
+                        Source = x.ChannelKey == 1 ? "Cabin" : "Cable",
                         Status = x.ActualEndDate.HasValue ? "Closed" : "Open"
                     })
                     .ToListAsync();
@@ -233,9 +252,22 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var query = _context.CuttingDownHeaders.AsQueryable();
+                var query = _context.CuttingDownHeaders
+                    .Include(x => x.ChannelKeyNavigation)
+                    .AsQueryable();
 
                 // Apply same filters as search
+                if (sourceKey.HasValue)
+                {
+                    if (sourceKey.Value == 1)
+                    {
+                        query = query.Where(x => x.ChannelKeyNavigation != null && x.ChannelKeyNavigation.ChannelName == "A");
+                    }
+                    else if (sourceKey.Value == 2)
+                    {
+                        query = query.Where(x => x.ChannelKeyNavigation != null && x.ChannelKeyNavigation.ChannelName == "B");
+                    }
+                }
                 if (problemTypeKey.HasValue)
                 {
                     query = query.Where(x => x.CuttingDownProblemTypeKey == problemTypeKey.Value);
@@ -266,7 +298,10 @@ namespace STA.Electricity.API.Controllers
                         StartDate = x.ActualCreateDate,
                         EndDate = x.ActualEndDate,
                         ProblemTypeKey = x.CuttingDownProblemTypeKey ?? 0,
-                        Source = "System",
+                        Source = x.ChannelKeyNavigation != null
+                            ? (x.ChannelKeyNavigation.ChannelName == "A" ? "Cabin"
+                                : x.ChannelKeyNavigation.ChannelName == "B" ? "Cable" : "System")
+                            : "System",
                         Status = x.ActualEndDate.HasValue ? "Closed" : "Open"
                     })
                     .ToListAsync();

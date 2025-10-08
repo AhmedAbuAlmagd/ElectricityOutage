@@ -22,9 +22,8 @@ namespace STA.Electricity.API.Controllers
             {
                 var sources = new List<LookupItemDto>
                 {
-                    new LookupItemDto { Key = 1, Name = "STA" },
-                    new LookupItemDto { Key = 2, Name = "FTA" },
-                    new LookupItemDto { Key = 3, Name = "Manual" }
+                    new LookupItemDto { Key = 1, Name = "Cabin" },
+                    new LookupItemDto { Key = 2, Name = "Cable" }
                 };
 
                 return Ok(sources);
@@ -49,7 +48,7 @@ namespace STA.Electricity.API.Controllers
                     .ToListAsync();
 
                 return Ok(problemTypes);
-            }
+            }   
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while retrieving problem types", error = ex.Message });

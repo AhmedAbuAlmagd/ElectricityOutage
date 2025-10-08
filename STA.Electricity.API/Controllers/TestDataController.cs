@@ -4,7 +4,6 @@ using Microsoft.Data.SqlClient;
 using STA.Electricity.API.Models;
 using Swashbuckle.AspNetCore.Annotations;
 using System.ComponentModel.DataAnnotations;
-using System.Data;
 
 namespace STA.Electricity.API.Controllers
 {
@@ -248,17 +247,16 @@ namespace STA.Electricity.API.Controllers
 
         private async Task<CuttingDownB> GenerateCableIncidentAsync(SqlConnection connection, string scenario)
         {
-            // Get actual cable names from database (Network_Element_Type_Key = 7 for Cable)
             var cableName = await GetRandomNetworkElementAsync(connection, 7);
 
             var incident = new CuttingDownB
             {
                 CuttingDownBIncidentId = _random.Next(100000, 999999),
                 CuttingDownCableName = "cab-1-1",
-                ProblemTypeKey = _random.Next(1, 13), // Based on your Problem_Type table
-                CreateDate = DateTime.Now.AddDays(-_random.Next(0, 30)),
+                ProblemTypeKey = _random.Next(1, 13), 
+                CreateDate = DateTime.Now,
                 IsActive = true,
-                CreatedUser = "SourceB", // Based on your Users table
+                CreatedUser = "SourceB",
                 UpdatedUser = "SourceB"
             };
 

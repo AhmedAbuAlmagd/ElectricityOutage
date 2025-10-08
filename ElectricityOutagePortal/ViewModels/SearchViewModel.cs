@@ -81,5 +81,6 @@ namespace ElectricityOutagePortal.ViewModels
         public string UpdateSystemUserID { get; set; } = string.Empty;
         public string CableName { get; set; } = string.Empty;
         public string CabinName { get; set; } = string.Empty;
+        public string IgnoreReason { get; set; } = string.Empty;
     }
 }
