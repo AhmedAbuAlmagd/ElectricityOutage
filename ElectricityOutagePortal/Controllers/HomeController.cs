@@ -32,91 +32,88 @@ namespace ElectricityOutagePortal.Controllers
         public async Task<IActionResult> Index(SearchViewModel model)
         {
             await LoadDropdownData(model);
-            
-            if (ModelState.IsValid)
-            {
-                try
-                {   
-                    var queryParams = new List<string>();
-                    
-                    if (model.SourceCutting.HasValue)
-                        queryParams.Add($"sourceKey={model.SourceCutting}");
-                    if (model.ProblemTypeKey.HasValue)
-                        queryParams.Add($"problemTypeKey={model.ProblemTypeKey}");
-                    if (model.Status.HasValue)
-                        queryParams.Add($"statusKey={model.Status}");
-                    if (model.SearchCriteriaKey.HasValue)
-                        queryParams.Add($"searchCriteriaKey={model.SearchCriteriaKey}");
-                    if (!string.IsNullOrWhiteSpace(model.SearchValue))
-                        queryParams.Add($"searchValue={Uri.EscapeDataString(model.SearchValue)}");
-                    if (model.StartDate.HasValue)
-                        queryParams.Add($"fromDate={model.StartDate:O}");
-                    if (model.EndDate.HasValue)
-                        queryParams.Add($"toDate={model.EndDate:O}");
-                    if (model.NetworkElementTypeKey.HasValue)
-                        queryParams.Add($"networkElementTypeKey={model.NetworkElementTypeKey}");
 
-                    queryParams.Add($"page={model.PageNumber}");
-                    queryParams.Add($"pageSize={model.PageSize}");
+            try
+            {   
+                var queryParams = new List<string>();
 
-                    var queryString = string.Join("&", queryParams);
-                    var response = await _httpClient.GetAsync($"{_apiBaseUrl}api/CuttingDown/search?{queryString}");
+                if (model.SourceCutting.HasValue)
+                    queryParams.Add($"sourceKey={model.SourceCutting}");
+                if (model.ProblemTypeKey.HasValue)
+                    queryParams.Add($"problemTypeKey={model.ProblemTypeKey}");
+                if (model.Status.HasValue)
+                    queryParams.Add($"statusKey={model.Status}");
+                if (model.SearchCriteriaKey.HasValue)
+                    queryParams.Add($"searchCriteriaKey={model.SearchCriteriaKey}");
+                if (!string.IsNullOrWhiteSpace(model.SearchValue))
+                    queryParams.Add($"searchValue={Uri.EscapeDataString(model.SearchValue)}");
+                if (model.StartDate.HasValue)
+                    queryParams.Add($"fromDate={model.StartDate:O}");
+                if (model.EndDate.HasValue)
+                    queryParams.Add($"toDate={model.EndDate:O}");
+                if (model.NetworkElementTypeKey.HasValue)
+                    queryParams.Add($"networkElementTypeKey={model.NetworkElementTypeKey}");
 
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var jsonContent = await response.Content.ReadAsStringAsync();
-                        var apiPaged = JsonSerializer.Deserialize<ElectricityOutagePortal.Models.ApiPagedResult<ElectricityOutagePortal.Models.ApiCuttingDownHeaderDto>>(jsonContent, new JsonSerializerOptions
-                        {
-                            PropertyNameCaseInsensitive = true
-                        });
+                queryParams.Add($"page={model.PageNumber}");
+                queryParams.Add($"pageSize={model.PageSize}");
 
-                        if (apiPaged != null)
-                        {
-                            // Map API models to portal view model DTO
-                            var mappedItems = apiPaged.Items.Select(x => new CuttingDownHeaderDto
-                            {
-                                Cutting_Down_Key = int.TryParse(x.CuttingIncidentId, out var cid) ? cid : 0,
-                                Cutting_Down_Incident_ID = x.CuttingIncidentId,
-                                Channel_Key = null,
-                                Cutting_Down_Problem_Type_Key = x.ProblemTypeKey,
-                                ActualCreateDate = x.StartDate,
-                                ActualEndDate = x.EndDate,
-                                SynchCreateDate = null,
-                                SynchUpdateDate = null,
-                                IsPlanned = null,
-                                IsGlobal = null,
-                                IsActive = null,
-                                PlannedStartDTS = x.StartDate,
-                                PlannedEndDTS = x.EndDate,
-                                CreateSystemUserID = "",
-                                UpdateSystemUserID = "",
-                                CableName = x.NetworkElementName,
-                                CabinName = x.NetworkElementName
-                            }).ToList();
+                var queryString = string.Join("&", queryParams);
+                var response = await _httpClient.GetAsync($"{_apiBaseUrl}api/CuttingDown/search?{queryString}");
 
-                            model.PagedResults = new PagedResult<CuttingDownHeaderDto>
-                            {
-                                Items = mappedItems,
-                                TotalCount = apiPaged.TotalCount,
-                                PageNumber = apiPaged.Page,
-                                PageSize = apiPaged.PageSize
-                            };
-                            model.Results = mappedItems;
-                            model.PageNumber = apiPaged.Page;
-                            model.PageSize = apiPaged.PageSize;
-                            model.TotalCount = apiPaged.TotalCount;
-                        }
-                    }
-                    else
-                    {
-                        ModelState.AddModelError("", "Failed to retrieve data from the API.");
-                    }
-                }
-                catch (Exception ex)
+                if (response.IsSuccessStatusCode)
                 {
-                    _logger.LogError(ex, "Error occurred while searching for cutting down incidents");
-                    ModelState.AddModelError("", "An error occurred while processing your request.");
+                    var jsonContent = await response.Content.ReadAsStringAsync();
+                    var apiPaged = JsonSerializer.Deserialize<ElectricityOutagePortal.Models.ApiPagedResult<ElectricityOutagePortal.Models.ApiCuttingDownHeaderDto>>(jsonContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    if (apiPaged != null)
+                    {
+                        // Map API models to portal view model DTO
+                        var mappedItems = apiPaged.Items.Select(x => new CuttingDownHeaderDto
+                        {
+                            Cutting_Down_Key = int.TryParse(x.CuttingIncidentId, out var cid) ? cid : 0,
+                            Cutting_Down_Incident_ID = x.CuttingIncidentId,
+                            Channel_Key = null,
+                            Cutting_Down_Problem_Type_Key = x.ProblemTypeKey,
+                            ActualCreateDate = x.StartDate,
+                            ActualEndDate = x.EndDate,
+                            SynchCreateDate = null,
+                            SynchUpdateDate = null,
+                            IsPlanned = null,
+                            IsGlobal = null,
+                            IsActive = null,
+                            PlannedStartDTS = x.StartDate,
+                            PlannedEndDTS = x.EndDate,
+                            CreateSystemUserID = "",
+                            UpdateSystemUserID = "",
+                            CableName = x.NetworkElementName,
+                            CabinName = x.NetworkElementName
+                        }).ToList();
+
+                        model.PagedResults = new PagedResult<CuttingDownHeaderDto>
+                        {
+                            Items = mappedItems,
+                            TotalCount = apiPaged.TotalCount,
+                            PageNumber = apiPaged.Page,
+                            PageSize = apiPaged.PageSize
+                        };
+                        model.Results = mappedItems;
+                        model.PageNumber = apiPaged.Page;
+                        model.PageSize = apiPaged.PageSize;
+                        model.TotalCount = apiPaged.TotalCount;
+                    }
                 }
+                else
+                {
+                    ModelState.AddModelError("", "Failed to retrieve data from the API.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while searching for cutting down incidents");
+                ModelState.AddModelError("", "An error occurred while processing your request.");
             }
 
             return View(model);
@@ -299,25 +296,23 @@ namespace ElectricityOutagePortal.Controllers
         {
             try
             {
-                var problemTypesResponse = await _httpClient.GetAsync($"{_apiBaseUrl}api/ProblemType/GetAll");
+                var problemTypesResponse = await _httpClient.GetAsync($"{_apiBaseUrl}api/Lookup/problem-types");
                 if (problemTypesResponse.IsSuccessStatusCode)
                 {
                     var jsonContent = await problemTypesResponse.Content.ReadAsStringAsync();
-                    model.ProblemTypes = JsonSerializer.Deserialize<List<ProblemTypeDto>>(jsonContent, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    }) ?? new List<ProblemTypeDto>();
+                    var items = JsonSerializer.Deserialize<List<ElectricityOutagePortal.Models.ApiLookupItemDto>>(jsonContent, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                        ?? new List<ElectricityOutagePortal.Models.ApiLookupItemDto>();
+                    model.ProblemTypes = items.Select(x => new ProblemTypeDto { Problem_Type_Key = x.Key, Problem_Type_Name = x.Name }).ToList();
                 }
 
                 // Load Network Element Types
-                var networkTypesResponse = await _httpClient.GetAsync($"{_apiBaseUrl}api/NetworkElementType/GetAll");
+                var networkTypesResponse = await _httpClient.GetAsync($"{_apiBaseUrl}api/Lookup/network-element-types");
                 if (networkTypesResponse.IsSuccessStatusCode)
                 {
                     var jsonContent = await networkTypesResponse.Content.ReadAsStringAsync();
-                    model.NetworkElementTypes = JsonSerializer.Deserialize<List<NetworkElementTypeDto>>(jsonContent, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    }) ?? new List<NetworkElementTypeDto>();
+                    var items = JsonSerializer.Deserialize<List<ElectricityOutagePortal.Models.ApiLookupItemDto>>(jsonContent, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                        ?? new List<ElectricityOutagePortal.Models.ApiLookupItemDto>();
+                    model.NetworkElementTypes = items.Select(x => new NetworkElementTypeDto { Network_Element_Type_Key = x.Key, Network_Element_Type_Name = x.Name }).ToList();
                 }
 
                 // Load Search Criteria from API

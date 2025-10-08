@@ -84,13 +84,12 @@ namespace STA.Electricity.API.Controllers
                 {
                     query = query.Where(x => x.ActualCreateDate <= toDate.Value);
                 }
-                var cuttingdownDetails = _context.CuttingDownDetails.Where(d => d.NetworkElementKey == networkElementTypeKey.Value);
-
                 if (networkElementTypeKey.HasValue)
                 {
-                        var cuttingdownKeys = cuttingdownDetails.Select(d => d.CuttingDownKey);
-                         query = query.Where(x => cuttingdownKeys.Contains(x.CuttingDownKey));
-
+                    var cuttingdownKeys = _context.CuttingDownDetails
+                        .Where(d => d.NetworkElementKey == networkElementTypeKey.Value)
+                        .Select(d => d.CuttingDownKey);
+                    query = query.Where(x => cuttingdownKeys.Contains(x.CuttingDownKey));
                 }
                 if (!string.IsNullOrEmpty(searchValue))
                 {
@@ -112,7 +111,7 @@ namespace STA.Electricity.API.Controllers
                         StartDate = x.ActualCreateDate ?? DateTime.MinValue,
                         EndDate = x.ActualEndDate,
                         ProblemTypeKey = x.CuttingDownProblemTypeKey ?? 0,
-                        Source = x.ChannelKey == 1 ? "Cabin" : "Cable",
+                        Source = x.ChannelKey == 1 ? "Cabin" : x.ChannelKey == 2 ? "Cable" : "System",
                         Status = x.ActualEndDate.HasValue ? "Closed" : "Open"
                     })
                     .ToListAsync();
