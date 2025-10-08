@@ -112,7 +112,7 @@
             {
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>Search Results (@Model.SearchResults.Count() items)</span>
+                        <span>Search Results (@Model.TotalItems items)</span>
                         <div class="export-buttons">
                             <button type="button" class="btn btn-success btn-sm">
                                 <i class="fas fa-file-excel"></i> Export
@@ -143,9 +143,11 @@
                                             <td>Network Element</td>
                                             <td>-</td>
                                             <td>
-                                                <span class="badge bg-success">
-                                                    Active
-                                                </span>
+                                                @{
+                                                    var status = item.Status ?? "";
+                                                    var badgeClass = status.Equals("Active", StringComparison.OrdinalIgnoreCase) ? "bg-success" : "bg-secondary";
+                                                }
+                                                <span class="badge @badgeClass">@status</span>
                                             </td>
                                             <td>
                                                 <button type="button" class="btn btn-primary btn-sm" onclick="selectNetworkElement('@item.CuttingIncidentId', '@item.NetworkElement')">
@@ -159,6 +161,40 @@
                                     }
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center p-3">
+                            <div>
+                                <form asp-action="NetworkHierarchy" method="post" class="d-inline">
+                                    <input type="hidden" name="SearchValue" value="@Model.SearchValue" />
+                                    <input type="hidden" name="NetworkElementTypeKey" value="@Model.NetworkElementTypeKey" />
+                                    <input type="hidden" name="PageSize" value="@Model.PageSize" />
+                                    <button class="btn btn-outline-secondary btn-sm" type="submit" name="PageNumber" value="@(Model.PageNumber - 1)" @(Model.PageNumber <= 1 ? "disabled" : "")>
+                                        <i class="fas fa-chevron-left"></i> Prev
+                                    </button>
+                                </form>
+                                <span class="mx-2">Page @Model.PageNumber of @Model.TotalPages</span>
+                                <form asp-action="NetworkHierarchy" method="post" class="d-inline">
+                                    <input type="hidden" name="SearchValue" value="@Model.SearchValue" />
+                                    <input type="hidden" name="NetworkElementTypeKey" value="@Model.NetworkElementTypeKey" />
+                                    <input type="hidden" name="PageSize" value="@Model.PageSize" />
+                                    <button class="btn btn-outline-secondary btn-sm" type="submit" name="PageNumber" value="@(Model.PageNumber + 1)" @(Model.PageNumber >= Model.TotalPages ? "disabled" : "")>
+                                        Next <i class="fas fa-chevron-right"></i>
+                                    </button>
+                                </form>
+                            </div>
+                            <div>
+                                <form asp-action="NetworkHierarchy" method="post" class="d-inline">
+                                    <input type="hidden" name="SearchValue" value="@Model.SearchValue" />
+                                    <input type="hidden" name="NetworkElementTypeKey" value="@Model.NetworkElementTypeKey" />
+                                    <input type="hidden" name="PageNumber" value="@Model.PageNumber" />
+                                    <label class="me-2">Page size</label>
+                                    <select name="PageSize" class="form-select form-select-sm d-inline w-auto" onchange="this.form.submit()">
+                                        <option value="10" @(Model.PageSize == 10 ? "selected" : "")>10</option>
+                                        <option value="20" @(Model.PageSize == 20 ? "selected" : "")>20</option>
+                                        <option value="50" @(Model.PageSize == 50 ? "selected" : "")>50</option>
+                                    </select>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>

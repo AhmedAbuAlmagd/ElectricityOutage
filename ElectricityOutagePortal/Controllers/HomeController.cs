@@ -123,6 +123,39 @@ namespace ElectricityOutagePortal.Controllers
         {
             var model = new NetworkHierarchyViewModel();
             await LoadNetworkHierarchyData(model);
+
+            try
+            {
+                var response = await _httpClient.GetAsync($"{_apiBaseUrl}api/NetworkElement/hierarchy");
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    var apiNodes = JsonSerializer.Deserialize<List<ElectricityOutagePortal.Models.ApiNetworkElementNodeDto>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                        ?? new List<ElectricityOutagePortal.Models.ApiNetworkElementNodeDto>();
+
+                    List<NetworkElementNode> MapNodes(List<ElectricityOutagePortal.Models.ApiNetworkElementNodeDto> nodes)
+                    {
+                        return nodes.Select(n => new NetworkElementNode
+                        {
+                            Id = n.Id,
+                            Name = n.Name,
+                            Type = n.Type,
+                            ParentId = null,
+                            Children = MapNodes(n.Children),
+                            IsExpanded = false,
+                            HasIncidents = false,
+                            IncidentCount = 0
+                        }).ToList();
+                    }
+
+                    model.NetworkElements = MapNodes(apiNodes);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while loading network hierarchy");
+            }
+
             return View(model);
         }
 
@@ -130,10 +163,52 @@ namespace ElectricityOutagePortal.Controllers
         public async Task<IActionResult> NetworkHierarchy(NetworkHierarchyViewModel model)
         {
             await LoadNetworkHierarchyData(model);
-            
-            // Implement search logic here
-            // This would call the appropriate API endpoints to get network hierarchy data
-            
+
+            try
+            {
+                var queryParams = new List<string>();
+                if (!string.IsNullOrWhiteSpace(model.SearchValue)) queryParams.Add($"searchTerm={Uri.EscapeDataString(model.SearchValue)}");
+                if (model.NetworkElementTypeKey.HasValue) queryParams.Add($"typeKey={model.NetworkElementTypeKey}");
+                // isActive left null for now; can add toggle in UI later
+                queryParams.Add($"page={model.PageNumber}");
+                queryParams.Add($"pageSize={model.PageSize}");
+
+                var url = $"{_apiBaseUrl}api/NetworkElement/search";
+                if (queryParams.Any()) url += $"?{string.Join("&", queryParams)}";
+
+                var response = await _httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    var apiPaged = JsonSerializer.Deserialize<ElectricityOutagePortal.Models.ApiPagedResult<ElectricityOutagePortal.Models.ApiNetworkElementDto>>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    if (apiPaged != null)
+                    {
+                        model.TotalItems = apiPaged.TotalCount;
+                        model.PageNumber = apiPaged.Page;
+                        model.PageSize = apiPaged.PageSize;
+                        model.TotalPages = apiPaged.TotalPages;
+
+                        // Map to view model's SearchResults list
+                        model.SearchResults = apiPaged.Items.Select(x => new NetworkIncidentDto
+                        {
+                            CuttingIncidentId = x.Key.ToString(),
+                            NetworkElement = x.Name,
+                            NumberOfImpactedCustomers = 0,
+                            Action = string.Empty,
+                            Status = x.IsActive ? "Active" : "Inactive"
+                        }).ToList();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while searching network elements");
+            }
+
             return View(model);
         }
 

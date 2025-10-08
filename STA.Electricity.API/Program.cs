@@ -86,6 +86,15 @@ namespace STA.Electricity.API
             // Add Service Layer (using stored procedures)
             builder.Services.AddScoped<STA.Electricity.API.Interfaces.ISyncService, STA.Electricity.API.Services.SyncService>();
 
+            // Register UnitOfWork, repositories, and service layer for queries/commands
+            builder.Services.AddScoped<STA.Electricity.API.Interfaces.IUnitOfWork, STA.Electricity.API.Repositories.UnitOfWork>();
+            builder.Services.AddScoped<STA.Electricity.API.Interfaces.ICuttingDownQueryRepository, STA.Electricity.API.Repositories.CuttingDownQueryRepository>();
+            builder.Services.AddScoped<STA.Electricity.API.Interfaces.IIgnoredOutagesRepository, STA.Electricity.API.Repositories.IgnoredOutagesRepository>();
+            builder.Services.AddScoped<STA.Electricity.API.Interfaces.ICuttingDownService, STA.Electricity.API.Services.CuttingDownService>();
+            builder.Services.AddScoped<STA.Electricity.API.Interfaces.IIgnoredOutagesService, STA.Electricity.API.Services.IgnoredOutagesService>();
+            builder.Services.AddScoped<STA.Electricity.API.Interfaces.ILookupService, STA.Electricity.API.Services.LookupService>();
+            builder.Services.AddScoped<STA.Electricity.API.Interfaces.INetworkElementService, STA.Electricity.API.Services.NetworkElementService>();
+
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowAll", policy =>

@@ -25,6 +25,7 @@ namespace STA.Electricity.API.Interfaces
         public int CreatedIncidents { get; set; }
         public int ClosedIncidents { get; set; }
         public int TotalProcessed { get; set; }
+        public int InsertedDetails { get; set; }
         public string? Error { get; set; }
     }
 }

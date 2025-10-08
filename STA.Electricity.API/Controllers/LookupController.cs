@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using STA.Electricity.API.Models;
+using STA.Electricity.API.Dtos;
+using STA.Electricity.API.Interfaces;
 
 namespace STA.Electricity.API.Controllers
 {
@@ -8,11 +9,11 @@ namespace STA.Electricity.API.Controllers
     [ApiController]
     public class LookupController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly ILookupService _lookupService;
 
-        public LookupController(AppDbContext context)
+        public LookupController(ILookupService lookupService)
         {
-            _context = context;
+            _lookupService = lookupService;
         }
 
         [HttpGet("sources")]
@@ -20,12 +21,7 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var sources = new List<LookupItemDto>
-                {
-                    new LookupItemDto { Key = 1, Name = "Cabin" },
-                    new LookupItemDto { Key = 2, Name = "Cable" }
-                };
-
+                var sources = await _lookupService.GetSourcesAsync();
                 return Ok(sources);
             }
             catch (Exception ex)
@@ -39,14 +35,7 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var problemTypes = await _context.ProblemTypes
-                    .Select(x => new LookupItemDto
-                    {
-                        Key = x.ProblemTypeKey,
-                        Name = x.ProblemTypeName ?? ""
-                    })
-                    .ToListAsync();
-
+                var problemTypes = await _lookupService.GetProblemTypesAsync();
                 return Ok(problemTypes);
             }   
             catch (Exception ex)
@@ -60,13 +49,7 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var statuses = new List<LookupItemDto>
-                    {
-                    new LookupItemDto { Key = 1, Name = "Open" },
-                    new LookupItemDto { Key = 2, Name = "Closed" },
-                    new LookupItemDto { Key = 3, Name = "In Progress" }
-                };
-
+                var statuses = await _lookupService.GetStatusesAsync();
                 return Ok(statuses);
             }
             catch (Exception ex)
@@ -80,13 +63,7 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var criteria = new List<LookupItemDto>
-                {
-                    new LookupItemDto { Key = 1, Name = "Incident ID" },
-                    new LookupItemDto { Key = 2, Name = "Network Element" },
-                    new LookupItemDto { Key = 3, Name = "Customer Count" }
-                };
-
+                var criteria = await _lookupService.GetSearchCriteriaAsync();
                 return Ok(criteria);
             }
             catch (Exception ex)
@@ -100,14 +77,7 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var networkElementTypes = await _context.NetworkElementTypes
-                    .Select(x => new LookupItemDto
-                    {
-                        Key = x.NetworkElementTypeKey,
-                        Name = x.NetworkElementTypeName ?? ""
-                    })
-                    .ToListAsync();
-
+                var networkElementTypes = await _lookupService.GetNetworkElementTypesAsync();
                 return Ok(networkElementTypes);
             }
             catch (Exception ex)
@@ -115,11 +85,5 @@ namespace STA.Electricity.API.Controllers
                 return StatusCode(500, new { message = "An error occurred while retrieving network element types", error = ex.Message });
             }
         }
-    }
-
-    public class LookupItemDto
-    {
-        public int Key { get; set; }
-        public string Name { get; set; } = string.Empty;
     }
 }

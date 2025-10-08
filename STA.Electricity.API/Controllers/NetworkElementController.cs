@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using STA.Electricity.API.Models;
+using STA.Electricity.API.Dtos;
+using STA.Electricity.API.Interfaces;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace STA.Electricity.API.Controllers
@@ -13,11 +15,11 @@ namespace STA.Electricity.API.Controllers
     [SwaggerTag("Manage network elements and hierarchy structure")]
     public class NetworkElementController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly INetworkElementService _service;
 
-        public NetworkElementController(AppDbContext context)
+        public NetworkElementController(INetworkElementService service)
         {
-            _context = context;
+            _service = service;
         }
 
         /// <summary>
@@ -33,16 +35,7 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var networkElements = await _context.NetworkElements
-                    .OrderBy(x => x.NetworkElementName)
-                    .ToListAsync();
-
-                // Build hierarchy tree
-                var rootElements = networkElements
-                    .Where(x => x.ParentNetworkElementKey == null)
-                    .Select(x => BuildNetworkNode(x, networkElements))
-                    .ToList();
-
+                var rootElements = await _service.GetNetworkHierarchyAsync();
                 return Ok(rootElements);
             }
             catch (Exception ex)
@@ -74,45 +67,8 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var query = _context.NetworkElements.AsQueryable();
-
-                if (!string.IsNullOrEmpty(searchTerm))
-                {
-                    query = query.Where(x => x.NetworkElementName.Contains(searchTerm));
-                }
-
-                if (typeKey.HasValue)
-                {
-                    query = query.Where(x => x.NetworkElementTypeKey == typeKey.Value);
-                }
-
-          
-
-                var totalCount = await query.CountAsync();
-
-                var items = await query
-                    .OrderBy(x => x.NetworkElementName)
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .Select(x => new NetworkElementDto
-                    {
-                        Key = x.NetworkElementKey,
-                        Name = x.NetworkElementName,
-                        Code = "",
-                        TypeKey = x.NetworkElementTypeKey ?? 0,
-                        ParentKey = x.ParentNetworkElementKey ?? 0,
-                        IsActive = true
-                    })
-                    .ToListAsync();
-
-                return Ok(new PagedResult<NetworkElementDto>
-                {
-                    Items = items,
-                    TotalCount = totalCount,
-                    Page = page,
-                    PageSize = pageSize,
-                    TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
-                });
+                var result = await _service.SearchNetworkElementsAsync(searchTerm, typeKey, isActive, page, pageSize);
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -134,24 +90,11 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var element = await _context.NetworkElements
-                    .Where(x => x.NetworkElementKey == key)
-                    .Select(x => new NetworkElementDto
-                    {
-                        Key = x.NetworkElementKey,
-                        Name = x.NetworkElementName,
-                        Code = "",
-                        TypeKey = x.NetworkElementTypeKey ?? 0,
-                        ParentKey = x.ParentNetworkElementKey ?? 0,
-                        IsActive = true
-                    })
-                    .FirstOrDefaultAsync();
-
+                var element = await _service.GetNetworkElementAsync(key);
                 if (element == null)
                 {
                     return NotFound(new { message = "Network element not found" });
                 }
-
                 return Ok(element);
             }
             catch (Exception ex)
@@ -174,20 +117,7 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var children = await _context.NetworkElements
-                    .Where(x => x.ParentNetworkElementKey == parentKey)
-                    .OrderBy(x => x.NetworkElementName)
-                    .Select(x => new NetworkElementDto
-                    {
-                        Key = x.NetworkElementKey,
-                        Name = x.NetworkElementName,
-                        Code = "",
-                        TypeKey = x.NetworkElementTypeKey ?? 0,
-                        ParentKey = x.ParentNetworkElementKey ?? 0,
-                        IsActive = true
-                    })
-                    .ToListAsync();
-
+                var children = await _service.GetChildrenAsync(parentKey);
                 return Ok(children);
             }
             catch (Exception ex)
@@ -215,102 +145,13 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var query = _context.CuttingDownDetails
-                    .Where(x => x.NetworkElementKey == networkElementKey);
-
-                var totalCount = await query.CountAsync();
-
-                var incidents = await _context.CuttingDownDetails
-                    .Where(x => x.NetworkElementKey == networkElementKey)
-                    .OrderByDescending(x => x.ActualCreateDate)
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .Select(x => new NetworkIncidentDto
-                    {
-                        CuttingIncidentId = x.CuttingDownDetailKey.ToString(),
-                        NetworkElement = "",
-                        StartDate = x.ActualCreateDate ?? DateTime.MinValue,
-                        EndDate = x.ActualEndDate,
-                        NumberOfImpactedCustomers = 0,
-                        Status = x.ActualEndDate.HasValue ? "Closed" : "Open"
-                    })
-                    .ToListAsync();
-
-                return Ok(new PagedResult<NetworkIncidentDto>
-                {
-                    Items = incidents,
-                    TotalCount = totalCount,
-                    Page = page,
-                    PageSize = pageSize,
-                    TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
-                });
+                var result = await _service.GetIncidentsAsync(networkElementKey, page, pageSize);
+                return Ok(result);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while retrieving network element incidents", error = ex.Message });
             }
         }
-
-        private NetworkElementNodeDto BuildNetworkNode(NetworkElement element, List<NetworkElement> allElements)
-        {
-            var node = new NetworkElementNodeDto
-            {
-                Id = element.NetworkElementKey,
-                Name = element.NetworkElementName,
-                Type = GetNetworkElementTypeName(element.NetworkElementTypeKey ?? 0),
-                HasChildren = allElements.Any(x => x.ParentNetworkElementKey == element.NetworkElementKey),
-                Children = new List<NetworkElementNodeDto>()
-            };
-
-            var children = allElements.Where(x => x.ParentNetworkElementKey == element.NetworkElementKey).ToList();
-            foreach (var child in children)
-            {
-                node.Children.Add(BuildNetworkNode(child, allElements));
-            }
-
-            return node;
-        }
-
-        private string GetNetworkElementTypeName(int typeKey)
-        {
-            return typeKey switch
-            {
-                1 => "Region",
-                2 => "Zone",
-                3 => "Substation",
-                4 => "Feeder",
-                5 => "Transformer",
-                _ => "Unknown"
-            };
-        }
-    }
-
-    public class NetworkElementDto
-    {
-        public int Key { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Code { get; set; } = string.Empty;
-        public int TypeKey { get; set; }
-        public int? ParentKey { get; set; }
-        public bool IsActive { get; set; }
-    }
-
-    public class NetworkElementNodeDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Type { get; set; } = string.Empty;
-        public bool HasChildren { get; set; }
-        public List<NetworkElementNodeDto> Children { get; set; } = new List<NetworkElementNodeDto>();
-    }
-
-    public class NetworkIncidentDto
-    {
-        public string CuttingIncidentId { get; set; } = string.Empty;
-        public string NetworkElement { get; set; } = string.Empty;
-        public DateTime StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-        public int NumberOfImpactedCustomers { get; set; }
-        public string Status { get; set; } = string.Empty;
     }
 }

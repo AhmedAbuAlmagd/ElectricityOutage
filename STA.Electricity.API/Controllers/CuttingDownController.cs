@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using STA.Electricity.API.Models;
+using STA.Electricity.API.Interfaces;
+using STA.Electricity.API.Dtos;
 using Swashbuckle.AspNetCore.Annotations;
 using System.ComponentModel.DataAnnotations;
 
@@ -14,11 +16,11 @@ namespace STA.Electricity.API.Controllers
     [SwaggerTag("Manage electricity cutting down incidents and outages")]
     public class CuttingDownController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly ICuttingDownService _service;
 
-        public CuttingDownController(AppDbContext context)
+        public CuttingDownController(ICuttingDownService service)
         {
-            _context = context;
+            _service = service;
         }
 
         /// <summary>
@@ -54,76 +56,20 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var query = _context.CuttingDownHeaders
-                    .Include(x => x.CuttingDownDetails).ThenInclude(y => y.NetworkElementKeyNavigation)
-                    .AsQueryable();
+                var result = await _service.SearchHeadersAsync(
+                    sourceKey,
+                    problemTypeKey,
+                    statusKey,
+                    searchCriteriaKey,
+                    networkElementTypeKey,
+                    searchValue,
+                    fromDate,
+                    toDate,
+                    page,
+                    pageSize);
 
-                if (sourceKey.HasValue)
-                {
-                    if (sourceKey.Value == 1)
-                    {
-                        query = query.Where(x => x.ChannelKey == 1);
-                    }
-                    else if (sourceKey.Value == 2)
-                    {
-                        query = query.Where(x=> x.ChannelKey == 2);
-                    }
-                }
-
-                if (problemTypeKey.HasValue)
-                {
-                    query = query.Where(x => x.CuttingDownProblemTypeKey == problemTypeKey.Value);
-                }
-
-                if (fromDate.HasValue)
-                {
-                    query = query.Where(x => x.ActualCreateDate >= fromDate.Value);
-                }
-
-                if (toDate.HasValue)
-                {
-                    query = query.Where(x => x.ActualCreateDate <= toDate.Value);
-                }
-                if (networkElementTypeKey.HasValue)
-                {
-                    var cuttingdownKeys = _context.CuttingDownDetails
-                        .Where(d => d.NetworkElementKey == networkElementTypeKey.Value)
-                        .Select(d => d.CuttingDownKey);
-                    query = query.Where(x => cuttingdownKeys.Contains(x.CuttingDownKey));
-                }
-                if (!string.IsNullOrEmpty(searchValue))
-                {
-                    query = query.Where(x => x.CuttingDownIncidentId.ToString().Contains(searchValue));
-                }
-
-                var totalCount = await query.CountAsync();
-
-                var items = await query
-                    .OrderByDescending(x => x.ActualCreateDate)
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .Select(x => new CuttingDownHeaderDto
-                    {
-
-                        CuttingIncidentId = x.CuttingDownIncidentId.ToString(),
-                        NetworkElementName = "Netowrk Element",
-                        NumberOfImpactedCustomers = 0,
-                        StartDate = x.ActualCreateDate ?? DateTime.MinValue,
-                        EndDate = x.ActualEndDate,
-                        ProblemTypeKey = x.CuttingDownProblemTypeKey ?? 0,
-                        Source = x.ChannelKey == 1 ? "Cabin" : x.ChannelKey == 2 ? "Cable" : "System",
-                        Status = x.ActualEndDate.HasValue ? "Closed" : "Open"
-                    })
-                    .ToListAsync();
-
-                return Ok(new PagedResult<CuttingDownHeaderDto>
-                {
-                    Items = items,
-                    TotalCount = totalCount,
-                    Page = page,
-                    PageSize = pageSize,
-                    TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
-                });
+                result.TotalPages = (int)Math.Ceiling((double)result.TotalCount / result.PageSize);
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -145,32 +91,11 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var details = await _context.CuttingDownHeaders
-                    .Where(x => x.CuttingDownIncidentId.ToString() == id)
-                    .Select(x => new CuttingDownDetailDto
-                    {
-                        CuttingIncidentId = x.CuttingDownIncidentId.ToString(),
-                        NetworkElementName = "Network Element",
-                        NetworkElementKey = 0,
-                        NumberOfImpactedCustomers = 0,
-                        StartDate = x.ActualCreateDate,
-                        EndDate = x.ActualEndDate,
-                        ProblemTypeKey = x.CuttingDownProblemTypeKey ?? 0,
-                        Source = "System",
-                        Status = x.ActualEndDate.HasValue ? "Closed" : "Open",
-                        Description = "Cutting down incident",
-                        CreatedBy = "System",
-                        CreatedDate = x.ActualCreateDate,
-                        UpdatedBy = "System",
-                        UpdatedDate = x.SynchUpdateDate
-                    })
-                    .FirstOrDefaultAsync();
-
+                var details = await _service.GetHeaderByIncidentIdAsync(id);
                 if (details == null)
                 {
                     return NotFound(new { message = "Cutting down incident not found" });
                 }
-
                 return Ok(details);
             }
             catch (Exception ex)
@@ -193,27 +118,7 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var details = await _context.CuttingDownDetails
-                    .Where(x => x.CuttingDownDetailKey.ToString() == cuttingIncidentId)
-                    .Select(x => new CuttingDownDetailDto
-                    {
-                        CuttingIncidentId = x.CuttingDownDetailKey.ToString(),
-                        NetworkElementKey = x.NetworkElementKey ?? 0,
-                        NetworkElementName = "Network Element",
-                        NumberOfImpactedCustomers = x.ImpactedCustomers ?? 0,
-                        StartDate = x.ActualCreateDate,
-                        EndDate = x.ActualEndDate,
-                        ProblemTypeKey = 0,
-                        Source = "System",
-                        Status = x.ActualEndDate.HasValue ? "Closed" : "Open",
-                        Description = "Cutting down detail",
-                        CreatedBy = "System",
-                        CreatedDate = x.ActualCreateDate,
-                        UpdatedBy = "System",
-                        UpdatedDate = x.ActualEndDate
-                    })
-                    .ToListAsync();
-
+                var details = await _service.GetDetailsByIncidentIdAsync(cuttingIncidentId);
                 return Ok(details);
             }
             catch (Exception ex)
@@ -251,61 +156,16 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var query = _context.CuttingDownHeaders
-                    .Include(x => x.ChannelKeyNavigation)
-                    .AsQueryable();
+                var data = await _service.ExportHeadersAsync(
+                    sourceKey,
+                    problemTypeKey,
+                    statusKey,
+                    searchCriteriaKey,
+                    networkElementTypeKey,
+                    searchValue,
+                    fromDate,
+                    toDate);
 
-                // Apply same filters as search
-                if (sourceKey.HasValue)
-                {
-                    if (sourceKey.Value == 1)
-                    {
-                        query = query.Where(x => x.ChannelKeyNavigation != null && x.ChannelKeyNavigation.ChannelName == "A");
-                    }
-                    else if (sourceKey.Value == 2)
-                    {
-                        query = query.Where(x => x.ChannelKeyNavigation != null && x.ChannelKeyNavigation.ChannelName == "B");
-                    }
-                }
-                if (problemTypeKey.HasValue)
-                {
-                    query = query.Where(x => x.CuttingDownProblemTypeKey == problemTypeKey.Value);
-                }
-
-                if (fromDate.HasValue)
-                {
-                    query = query.Where(x => x.ActualCreateDate >= fromDate.Value);
-                }
-
-                if (toDate.HasValue)
-                {
-                    query = query.Where(x => x.ActualCreateDate <= toDate.Value);
-                }
-
-                if (!string.IsNullOrEmpty(searchValue))
-                {
-                    query = query.Where(x => x.CuttingDownIncidentId.ToString().Contains(searchValue));
-                }
-
-                var data = await query
-                    .OrderByDescending(x => x.ActualCreateDate)
-                    .Select(x => new
-                    {
-                        CuttingIncidentId = x.CuttingDownIncidentId.ToString(),
-                        NetworkElementName = "Network Element",
-                        NumberOfImpactedCustomers = 0,
-                        StartDate = x.ActualCreateDate,
-                        EndDate = x.ActualEndDate,
-                        ProblemTypeKey = x.CuttingDownProblemTypeKey ?? 0,
-                        Source = x.ChannelKeyNavigation != null
-                            ? (x.ChannelKeyNavigation.ChannelName == "A" ? "Cabin"
-                                : x.ChannelKeyNavigation.ChannelName == "B" ? "Cable" : "System")
-                            : "System",
-                        Status = x.ActualEndDate.HasValue ? "Closed" : "Open"
-                    })
-                    .ToListAsync();
-
-                // For now, return JSON data. In a real implementation, you would generate Excel file
                 return Ok(new { message = "Export functionality - would generate Excel file", data = data });
             }
             catch (Exception ex)
@@ -315,56 +175,5 @@ namespace STA.Electricity.API.Controllers
         }
     }
 
-    // DTOs
-    public class CuttingDownHeaderDto
-    {
-        public string CuttingIncidentId { get; set; } = string.Empty;
-        public string NetworkElementName { get; set; } = string.Empty;
-        public int NumberOfImpactedCustomers { get; set; }
-        public DateTime StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-        public int ProblemTypeKey { get; set; }
-        public string Source { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
-    }
-
-    public class CuttingDownDto
-    {
-        public string CuttingIncidentId { get; set; } = string.Empty;
-        public int NetworkElementKey { get; set; }
-        public string NetworkElementName { get; set; } = string.Empty;
-        public int NumberOfImpactedCustomers { get; set; }
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-        public int ProblemTypeKey { get; set; }
-        public string Source { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
-    }
-
-    public class CuttingDownDetailDto
-    {
-        public string CuttingIncidentId { get; set; } = string.Empty;
-        public int NetworkElementKey { get; set; }
-        public string NetworkElementName { get; set; } = string.Empty;
-        public int NumberOfImpactedCustomers { get; set; }
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-        public int ProblemTypeKey { get; set; }
-        public string Source { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public string CreatedBy { get; set; } = string.Empty;
-        public DateTime? CreatedDate { get; set; }
-        public string UpdatedBy { get; set; } = string.Empty;
-        public DateTime? UpdatedDate { get; set; }
-    }
-
-    public class PagedResult<T>
-    {
-        public List<T> Items { get; set; } = new List<T>();
-        public int TotalCount { get; set; }
-        public int Page { get; set; }
-        public int PageSize { get; set; }
-        public int TotalPages { get; set; }
-    }
+    
 }

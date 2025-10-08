@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using STA.Electricity.API.Models;
+using STA.Electricity.API.Dtos;
+using STA.Electricity.API.Interfaces;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace STA.Electricity.API.Controllers
@@ -13,11 +15,11 @@ namespace STA.Electricity.API.Controllers
     [SwaggerTag("Manage ignored outage incidents and exclusion rules")]
     public class IgnoredOutagesController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IIgnoredOutagesService _service;
 
-        public IgnoredOutagesController(AppDbContext context)
+        public IgnoredOutagesController(IIgnoredOutagesService service)
         {
-            _context = context;
+            _service = service;
         }
 
         /// <summary>
@@ -53,55 +55,20 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var query = _context.CuttingDownIgnoreds.AsQueryable();
+                var result = await _service.SearchAsync(
+                    sourceKey,
+                    problemTypeKey,
+                    statusKey,
+                    searchCriteriaKey,
+                    networkElementTypeKey,
+                    searchValue,
+                    fromDate,
+                    toDate,
+                    page,
+                    pageSize);
 
-                if (fromDate.HasValue)
-                {
-                    query = query.Where(x => x.ActualCreateDate >= fromDate.Value);
-                }
-
-                if (toDate.HasValue)
-                {
-                    query = query.Where(x => x.ActualCreateDate <= toDate.Value);
-                }
-
-                if (!string.IsNullOrEmpty(searchValue))
-                {
-                    query = query.Where(x => x.CuttingDownIncidentId.ToString().Contains(searchValue) ||
-                                           x.CabelName.Contains(searchValue) ||
-                                           x.CabinName.Contains(searchValue));
-                }
-
-                var totalCount = await query.CountAsync();
-
-                var items = await query
-                    .OrderByDescending(x => x.ActualCreateDate)
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .Select(x => new IgnoredOutageDto
-                    {
-                        CuttingIncidentId = x.CuttingDownIncidentId.ToString(),
-                        NetworkElementName = x.CabelName ?? x.CabinName ?? "",
-                        NumberOfImpactedCustomers = 0,
-                        StartDate = x.ActualCreateDate ?? DateTime.MinValue,
-                        EndDate = null,
-                        ProblemTypeKey = 0,
-                        Source = "System",
-                        Status = "Ignored",
-                        IgnoredDate = x.SynchCreateDate,
-                        IgnoredBy = x.CreatedUser,
-                        IgnoreReason = "Automatically ignored"
-                    })
-                    .ToListAsync();
-
-                return Ok(new PagedResult<IgnoredOutageDto>
-                {
-                    Items = items,
-                    TotalCount = totalCount,
-                    Page = page,
-                    PageSize = pageSize,
-                    TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
-                });
+                result.TotalPages = (int)Math.Ceiling((double)result.TotalCount / result.PageSize);
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -123,23 +90,7 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var outage = await _context.CuttingDownIgnoreds
-                    .Where(x => x.CuttingDownIncidentId.ToString() == id)
-                    .Select(x => new IgnoredOutageDto
-                    {
-                        CuttingIncidentId = x.CuttingDownIncidentId.ToString(),
-                        NetworkElementName = x.CabelName ?? x.CabinName ?? "",
-                        NumberOfImpactedCustomers = 0,
-                        StartDate = x.ActualCreateDate ?? DateTime.MinValue,
-                        EndDate = null,
-                        ProblemTypeKey = 0,
-                        Source = "System",
-                        Status = "Ignored",
-                        IgnoredDate = x.SynchCreateDate,
-                        IgnoredBy = x.CreatedUser,
-                        IgnoreReason = "Automatically ignored"
-                    })
-                    .FirstOrDefaultAsync();
+                var outage = await _service.GetByIncidentIdAsync(id);
 
                 if (outage == null)
                 {
@@ -168,17 +119,7 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var ignoredOutage = new CuttingDownIgnored
-                {
-                    CuttingDownIncidentId = int.Parse(request.CuttingIncidentId),
-                    ActualCreateDate = DateTime.UtcNow,
-                    SynchCreateDate = DateTime.UtcNow,
-                    CreatedUser = request.IgnoredBy,
-                    CabelName = request.Reason
-                };
-
-                _context.CuttingDownIgnoreds.Add(ignoredOutage);
-                await _context.SaveChangesAsync();
+                await _service.IgnoreAsync(request.CuttingIncidentId, request.IgnoredBy, request.Reason);
 
                 return Ok(new { message = "Outage successfully ignored" });
             }
@@ -202,16 +143,12 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var ignoredOutage = await _context.CuttingDownIgnoreds
-                    .FirstOrDefaultAsync(x => x.CuttingDownIncidentId.ToString() == id);
+                var success = await _service.UnignoreAsync(id);
 
-                if (ignoredOutage == null)
+                if (!success)
                 {
                     return NotFound(new { message = "Ignored outage not found" });
                 }
-
-                _context.CuttingDownIgnoreds.Remove(ignoredOutage);
-                await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Outage successfully unignored" });
             }
@@ -250,42 +187,15 @@ namespace STA.Electricity.API.Controllers
         {
             try
             {
-                var query = _context.CuttingDownIgnoreds.AsQueryable();
-
-                if (fromDate.HasValue)
-                {
-                    query = query.Where(x => x.ActualCreateDate >= fromDate.Value);
-                }
-
-                if (toDate.HasValue)
-                {
-                    query = query.Where(x => x.ActualCreateDate <= toDate.Value);
-                }
-
-                if (!string.IsNullOrEmpty(searchValue))
-                {
-                    query = query.Where(x => x.CuttingDownIncidentId.ToString().Contains(searchValue) ||
-                                           x.CabelName.Contains(searchValue) ||
-                                           x.CabinName.Contains(searchValue));
-                }
-
-                var data = await query
-                    .OrderByDescending(x => x.ActualCreateDate)
-                    .Select(x => new
-                    {
-                        CuttingIncidentId = x.CuttingDownIncidentId.ToString(),
-                        NetworkElementName = x.CabelName ?? x.CabinName ?? "",
-                        NumberOfImpactedCustomers = 0,
-                        StartDate = x.ActualCreateDate,
-                        EndDate = (DateTime?)null,
-                        ProblemTypeKey = 0,
-                        Source = "System",
-                        Status = "Ignored",
-                        IgnoredDate = x.SynchCreateDate,
-                        IgnoredBy = x.CreatedUser,
-                        IgnoreReason = "Automatically ignored"
-                    })
-                    .ToListAsync();
+                var data = await _service.ExportAsync(
+                    sourceKey,
+                    problemTypeKey,
+                    statusKey,
+                    searchCriteriaKey,
+                    networkElementTypeKey,
+                    searchValue,
+                    fromDate,
+                    toDate);
 
                 // For now, return JSON data. In a real implementation, you would generate Excel file
                 return Ok(new { message = "Export functionality - would generate Excel file", data = data });
@@ -297,26 +207,5 @@ namespace STA.Electricity.API.Controllers
         }
     }
 
-    // DTOs
-    public class IgnoredOutageDto
-    {
-        public string CuttingIncidentId { get; set; } = string.Empty;
-        public string NetworkElementName { get; set; } = string.Empty;
-        public int NumberOfImpactedCustomers { get; set; }
-        public DateTime StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-        public int ProblemTypeKey { get; set; }
-        public string Source { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
-        public DateTime? IgnoredDate { get; set; }
-        public string? IgnoredBy { get; set; }
-        public string? IgnoreReason { get; set; }
-    }
-
-    public class IgnoreOutageRequest
-    {
-        public string CuttingIncidentId { get; set; } = string.Empty;
-        public string IgnoredBy { get; set; } = string.Empty;
-        public string Reason { get; set; } = string.Empty;
-    }
+    
 }

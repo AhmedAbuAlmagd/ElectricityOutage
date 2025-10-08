@@ -3,23 +3,26 @@
 @if (Model != null)
 {
     <div class="tree-node-container">
-        <div class="tree-node" onclick="selectTreeNode(this)">
+        <div class="tree-node d-flex align-items-center" onclick="selectTreeNode(this)" title="@Model.Type">
             @if (Model.Children != null && Model.Children.Any())
             {
-                <span class="tree-toggle" onclick="toggleTreeNode(this)">▼</span>
+                <span class="tree-toggle" onclick="event.stopPropagation(); toggleTreeNode(this)">@(Model.IsExpanded ? "▼" : "▶")</span>
             }
             else
             {
                 <span class="tree-spacer">&nbsp;&nbsp;&nbsp;</span>
             }
-            <i class="fas fa-@(GetIconForType(Model.Type)) me-1"></i>
-            <span class="node-text">@Model.Name</span>
-            <small class="text-muted">(ID: @Model.Id)</small>
+            <i class="fas fa-@(GetIconForType(Model.Type)) me-2 text-secondary"></i>
+            <span class="node-text flex-grow-1">@Model.Name <small class="text-muted">(#@Model.Id)</small></span>
+            @if (Model.HasIncidents && Model.IncidentCount > 0)
+            {
+                <span class="badge bg-danger ms-2">@Model.IncidentCount</span>
+            }
         </div>
-        
+
         @if (Model.Children != null && Model.Children.Any())
         {
-            <div class="tree-children">
+            <div class="tree-children" style="display: @(Model.IsExpanded ? "block" : "none")">
                 @foreach (var child in Model.Children)
                 {
                     @await Html.PartialAsync("_NetworkTreeNode", child)
@@ -34,13 +37,13 @@
     {
         return type?.ToLower() switch
         {
-            "region" => "map-marked-alt",
-            "governorate" => "city",
+            "region" => "sitemap",
+            "governorate" => "landmark",
             "district" => "building",
             "substation" => "bolt",
             "feeder" => "plug",
             "transformer" => "cog",
-            _ => "circle"
+            _ => "network-wired"
         };
     }
 }

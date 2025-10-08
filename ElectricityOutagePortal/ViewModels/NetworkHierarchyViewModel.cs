@@ -19,6 +19,9 @@ namespace ElectricityOutagePortal.ViewModels
         // Search results
         public List<NetworkIncidentDto> SearchResults { get; set; } = new List<NetworkIncidentDto>();
         public int TotalItems { get; set; }
+        public int PageNumber { get; set; } = 1;
+        public int PageSize { get; set; } = 20;
+        public int TotalPages { get; set; }
     }
 
     public class NetworkElementNode
@@ -39,5 +42,6 @@ namespace ElectricityOutagePortal.ViewModels
         public int NumberOfImpactedCustomers { get; set; }
         public string CuttingIncidentId { get; set; } = string.Empty;
         public string Action { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
     }
 }
